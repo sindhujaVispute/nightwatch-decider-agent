@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+local_model/
+data/results.json
+data/routed_results.json
+*.onnx
+*.onnx_data
