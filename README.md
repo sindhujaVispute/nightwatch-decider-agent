@@ -9,6 +9,7 @@ On-call engineers suffer from alert fatigue. Most alerts are noise. However, mis
 1. **Decider 2B (Fast Gate):** Reads the alert state and instantly decides `page`, `queue_for_digest`, or `suppress`. 
 2. **Confidence Band Routing:** If Decider 2B is highly confident (<0.85), it acts immediately. If it is unsure, the decision is escalated to **Amazon Bedrock** (the LLM) for deeper reasoning.
 
+
 ## Reusable Pattern: Decider-Gate
 This repository includes a reusable `InterventionHandler` in the [`patterns/decider-gate`](./patterns/decider-gate) folder. You can drop this file into your own Strands agents to prevent them from taking low-confidence actions.
 
@@ -16,3 +17,40 @@ This repository includes a reusable `InterventionHandler` in the [`patterns/deci
 1. Install requirements: `pip install -r requirements.txt`
 2. Generate the synthetic data: `python generate_alerts.py`
 3. Run the agent: `python router.py`
+# Nightwatch: Pager Fatigue Agent
+
+An AI agent built for the Strands Decider Hackathon that uses **Strands Decider 2B** (`#policy` pattern) to filter out server alert noise before it wakes up an on-call engineer.
+
+## Architecture
+
+```text
+                  ┌──────────────────────────────────────┐
+                  │  Monitoring Alert (e.g., P1 Error)   │
+                  └────────────────┬─────────────────────┘
+                                   │
+                                   ▼
+                  ┌──────────────────────────────────────┐
+                  │  State Builder (Extracts context)    │
+                  └────────────────┬─────────────────────┘
+                                   │
+                                   ▼
+               ╔═══════════════════════════════════════════╗
+               ║  Strands Decider 2B (Fast Gate)           ║
+               ║  Q: Should this page a human?             ║
+               ║  Output: Choice + Confidence Score        ║
+               ╚═══════════════════════┬═══════════════════╝
+                                       │
+                        Confidence < 0.40 ?
+                      ┌────────────────┴────────────────┐
+                     YES                               NO
+                      │                                 │
+                      ▼                                 ▼
+       ┌─────────────────────────────┐   ┌─────────────────────────────┐
+       │ Amazon Bedrock (Claude)     │   │ Act on Decider's choice     │
+       │ Deep reasoning on edge case │   │ (Page or Suppress instantly)│
+       └──────────────┬──────────────┘   └─────────────────────────────┘
+                      │
+                      ▼
+       ┌─────────────────────────────┐
+       │ Act on Bedrock's choice     │
+       └─────────────────────────────┘
